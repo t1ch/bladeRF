@@ -124,7 +124,8 @@ make_revision foxhunt
 # Create the wlan
 make_revision wlan
 
-
+# Create enodeb
+make_revision enodeb
 # Projects created!
 puts "${PROJECT_NAME} projects created!"
 puts "Please use the build.tcl script to build images.\n"
