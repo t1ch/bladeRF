@@ -29,6 +29,9 @@ library work;
     use work.bladerf_p.all;
     use work.fifo_readwrite_p.all;
 
+library enodeb;
+    use enodeb.all;
+
 architecture hosted_bladerf of bladerf is
 
     attribute noprune          : boolean;
@@ -174,6 +177,15 @@ architecture hosted_bladerf of bladerf is
     signal wbm_wb_ack_i           : std_logic;
     signal wbm_wb_cyc_o           : std_logic;
 begin
+
+    U_enodeb_top : entity enodeb.enodeb_top
+      port map(
+        tx_clock => tx_clock,
+        tx_led_1 => led(1),
+        tx_led_2 => led(2),
+        tx_led_3 => led(3)
+
+);
 
     U_rx_pkt_gen : entity work.rx_packet_generator
         port map(
@@ -478,9 +490,9 @@ begin
     tx_trigger_ctl <= unpack(tx_trigger_ctl_i, tx_trigger_line);
 
     -- LEDs
-    led(1) <= led1_blink        when nios_gpio.o.led_mode = '0' else not nios_gpio.o.leds(1);
-    led(2) <= tx_underflow_led  when nios_gpio.o.led_mode = '0' else not nios_gpio.o.leds(2);
-    led(3) <= rx_overflow_led   when nios_gpio.o.led_mode = '0' else not nios_gpio.o.leds(3);
+--    led(1) <= led1_blink        when nios_gpio.o.led_mode = '0' else not nios_gpio.o.leds(1);
+--    led(2) <= tx_underflow_led  when nios_gpio.o.led_mode = '0' else not nios_gpio.o.leds(2);
+--    led(3) <= rx_overflow_led   when nios_gpio.o.led_mode = '0' else not nios_gpio.o.leds(3);
 
     -- DAC SPI (data latched on falling edge)
     dac_sclk <= not nios_sclk when nios_gpio.o.adf_chip_enable = '0' else '0';
