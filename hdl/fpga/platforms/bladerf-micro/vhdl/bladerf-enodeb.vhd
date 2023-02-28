@@ -180,6 +180,8 @@ begin
 
     U_enodeb_top : entity enodeb.enodeb_top
       port map(
+        tx_packet_control => tx_packet_control,
+        tx_packet_ready => tx_packet_ready,
         tx_clock => tx_clock,
         tx_led_1 => led(1),
         tx_led_2 => led(2),
@@ -533,7 +535,7 @@ begin
         exp_gpio(i) <= nios_xb_gpio_out(i) when nios_xb_gpio_oe(i) = '1' else 'Z';
     end generate;
 
-    tx_packet_ready <= '1';
+    --tx_packet_ready <= '1';
 
     -- TX Submodule
     U_tx : entity work.tx
