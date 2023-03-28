@@ -184,10 +184,8 @@ begin
         tx_reset => tx_reset,
         tx_packet_control => tx_packet_control,
         tx_packet_empty => tx_packet_empty,
-        tx_led_1 => led(1),
-        tx_led_2 => led(2),
-        tx_led_3 => led(3)
-
+        tx_packet_ready => tx_packet_ready,
+        tx_leds => led
 );
 
     U_rx_pkt_gen : entity work.rx_packet_generator
@@ -536,7 +534,7 @@ begin
         exp_gpio(i) <= nios_xb_gpio_out(i) when nios_xb_gpio_oe(i) = '1' else 'Z';
     end generate;
 
-    tx_packet_ready <= '1';
+   -- tx_packet_ready <= '1';
 
     -- TX Submodule
     U_tx : entity work.tx
