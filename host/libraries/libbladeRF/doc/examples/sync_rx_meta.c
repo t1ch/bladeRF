@@ -32,8 +32,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <getopt.h>
 
 #include "example_common.h"
+#include "conversions.h"
+#include "log.h"
 
 /* Initialize sync interface for metadata and allocate our "working"
  * buffer that we'd use to process our RX'd samples.
@@ -41,7 +44,8 @@
  * Return sample buffer on success, or NULL on failure.
  */
 
-int16_t *init(struct bladerf *dev, int16_t num_samples)
+int16_t *init(struct bladerf *dev, int16_t num_samples, bladerf_format format,
+              bladerf_channel_layout channel_layout, unsigned int buffer_size)
 {
     int status = -1;
 
@@ -61,7 +65,6 @@ int16_t *init(struct bladerf *dev, int16_t num_samples)
      * interface. The "buffer" here refers to those used internally by worker
      * threads, not the `samples` buffer above. */
     const unsigned int num_buffers   = 16;
-    const unsigned int buffer_size   = 8192;
     const unsigned int num_transfers = 8;
     const unsigned int timeout_ms    = 1000;
 
@@ -75,8 +78,8 @@ int16_t *init(struct bladerf *dev, int16_t num_samples)
 
     /* Configure the device's RX for use with the sync interface.
      * SC16 Q11 samples *with* metadata are used. */
-    status = bladerf_sync_config(dev, BLADERF_RX_X1,
-                                 BLADERF_FORMAT_SC16_Q11_META, num_buffers,
+    status = bladerf_sync_config(dev, channel_layout,
+                                 format, num_buffers,
                                  buffer_size, num_transfers, timeout_ms);
     if (status != 0) {
         fprintf(stderr, "Failed to configure RX sync interface: %s\n",
@@ -90,11 +93,18 @@ int16_t *init(struct bladerf *dev, int16_t num_samples)
     /* We must always enable the RX front end *after* calling
      * bladerf_sync_config(), and *before* attempting to RX samples via
      * bladerf_sync_rx(). */
-    status = bladerf_enable_module(dev, BLADERF_RX, true);
+    status = bladerf_enable_module(dev, BLADERF_CHANNEL_RX(0), true);
     if (status != 0) {
-        fprintf(stderr, "Failed to enable RX: %s\n", bladerf_strerror(status));
-
+        fprintf(stderr, "Failed to enable RX(0): %s\n", bladerf_strerror(status));
         goto error;
+    }
+
+    if (channel_layout == BLADERF_RX_X2) {
+        status = bladerf_enable_module(dev, BLADERF_CHANNEL_RX(1), true);
+        if (status != 0) {
+            fprintf(stderr, "Failed to enable RX(1): %s\n", bladerf_strerror(status));
+            goto error;
+        }
     }
 
     status = 0;
@@ -234,9 +244,31 @@ int sync_rx_meta_sched_example(struct bladerf *dev,
 
 /** [rx_meta_sched_example] */
 
+static struct option const long_options[] = {
+    { "device", required_argument, NULL, 'd' },
+    { "bitmode", required_argument, NULL, 'b' },
+    { "buflen", required_argument, NULL, 'l' },
+    { "mimo", no_argument, NULL, 'm' },
+    { "numsamples", required_argument, NULL, 'n' },
+    { "rxcount", required_argument, NULL, 'c' },
+    { "verbosity", required_argument, 0, 'v' },
+    { "help", no_argument, NULL, 'h' },
+    { NULL, 0, NULL, 0 },
+};
+
 static void usage(const char *argv0)
 {
-    printf("Usage: %s [device specifier]\n\n", argv0);
+    printf("Usage: %s [options]\n", argv0);
+    printf("  -d, --device <str>        Specify device to open.\n");
+    printf("  -b, --bitmode <mode>      Specify 16bit or 8bit mode\n");
+    printf("                              <16bit|16> (default)\n");
+    printf("                              <8bit|8>\n");
+    printf("  -l, --buflen              Buffer Size\n");
+    printf("  -m, --mimo                Enable MIMO\n");
+    printf("  -n, --numsamples          Specify Number of samples\n");
+    printf("  -c, --rxcount <int>       Specify RX sync iterations\n");
+    printf("  -v, --verbosity <level>   Set test verbosity\n");
+    printf("  -h, --help                Show this text.\n");
 }
 
 int main(int argc, char *argv[])
@@ -245,26 +277,98 @@ int main(int argc, char *argv[])
     struct bladerf *dev = NULL;
     const char *devstr  = NULL;
     int16_t *samples    = NULL;
+    bladerf_channel_layout channel_layout = BLADERF_RX_X1;
+    bladerf_format fmt  = BLADERF_FORMAT_SC16_Q11_META;
 
-    const unsigned int num_samples = 4096;
-    const unsigned int rx_count    = 15;
+    unsigned int num_samples = 4096;
+    unsigned int rx_count    = 15;
+    unsigned int buffer_size = 4096;
     const unsigned int timeout_ms  = 2500;
 
-    if (argc == 2) {
-        if (!strcasecmp("-h", argv[1]) || !strcasecmp("--help", argv[1])) {
-            usage(argv[0]);
-            return 0;
-        } else {
-            devstr = argv[1];
+    bladerf_log_level lvl = BLADERF_LOG_LEVEL_SILENT;
+    bladerf_log_set_verbosity(lvl);
+    bool ok;
+
+    int opt = 0;
+    int opt_ind = 0;
+    while (opt != -1) {
+        opt = getopt_long(argc, argv, "d:b:l:mn:c:v:h", long_options, &opt_ind);
+
+        switch (opt) {
+            case 'd':
+                devstr = optarg;
+                break;
+
+            case 'b':
+                if (strcmp(optarg, "16bit") == 0 || strcmp(optarg, "16") == 0) {
+                    fmt = BLADERF_FORMAT_SC16_Q11_META;
+                } else if (strcmp(optarg, "8bit") == 0 || strcmp(optarg, "8") == 0) {
+                    fmt = BLADERF_FORMAT_SC8_Q7_META;
+                } else {
+                    printf("Unknown bitmode: %s\n", optarg);
+                    return -1;
+                }
+                break;
+
+            case 'l':
+                buffer_size = str2int(optarg, 1, INT_MAX, &ok);
+                if (!ok) {
+                    printf("Buffer size invalid: %s\n", optarg);
+                    return -1;
+                }
+                break;
+
+            case 'm':
+                channel_layout = BLADERF_RX_X2;
+                break;
+
+            case 'n':
+                num_samples = str2int(optarg, 1, INT_MAX, &ok);
+                if (!ok) {
+                    printf("Number of samples not valid: %s\n", optarg);
+                    return -1;
+                }
+                break;
+
+            case 'c':
+                rx_count = str2int(optarg, 1, INT_MAX, &ok);
+                if (!ok) {
+                    printf("RX count not valid: %s\n", optarg);
+                    return -1;
+                }
+                break;
+
+            case 'v':
+                lvl = str2loglevel(optarg, &ok);
+                if (!ok) {
+                    log_error("Invalid log level provided: %s\n", optarg);
+                    return -1;
+                } else {
+                    bladerf_log_set_verbosity(lvl);
+                }
+                break;
+
+            case 'h':
+                usage(argv[0]);
+                return 0;
+
+            default:
+                break;
         }
-    } else if (argc > 1) {
-        usage(argv[0]);
-        return -1;
     }
 
     dev = example_init(devstr);
+    printf("Format: ");
+    if (fmt == BLADERF_FORMAT_SC16_Q11_META)
+        printf("SC16_Q11_META\n");
+    else
+        printf("SC8_Q7_META\n");
+    printf("RX Count: %i\n", rx_count);
+    printf("Mimo: %s\n", (channel_layout == BLADERF_RX_X2) ? "Enabled" : "Disabled");
+    printf("Buffer Size: %i\n", buffer_size);
+
     if (dev) {
-        samples = init(dev, num_samples);
+        samples = init(dev, num_samples, fmt, channel_layout, buffer_size);
         if (samples != NULL) {
             printf("\nRunning RX meta \"now\" example...\n");
             status = sync_rx_meta_now_example(dev, samples, num_samples,

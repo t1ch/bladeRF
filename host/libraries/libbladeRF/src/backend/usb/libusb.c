@@ -1068,25 +1068,25 @@ static void LIBUSB_CALL lusb_stream_cb(struct libusb_transfer *transfer)
                 break;
 
             case LIBUSB_TRANSFER_STALL:
-                log_error("Hit stall for buffer %p\n", transfer->buffer);
+                log_error("Hit stall for buffer %p\n\r", transfer->buffer);
                 stream->error_code = BLADERF_ERR_IO;
                 break;
 
             case LIBUSB_TRANSFER_ERROR:
-                log_error("Got transfer error for buffer %p\n",
+                log_error("Got transfer error for buffer %p\n\r",
                           transfer->buffer);
                 stream->error_code = BLADERF_ERR_IO;
                 break;
 
             case LIBUSB_TRANSFER_OVERFLOW:
                 log_error("Got transfer over for buffer %p, "
-                          "transfer \"actual_length\" = %d\n",
+                          "transfer \"actual_length\" = %d\n\r",
                           transfer->buffer, transfer->actual_length);
                 stream->error_code = BLADERF_ERR_IO;
                 break;
 
             case LIBUSB_TRANSFER_TIMED_OUT:
-                log_error("Transfer timed out for buffer %p\n",
+                log_error("Transfer timed out for buffer %p\n\r",
                           transfer->buffer);
                 stream->error_code = BLADERF_ERR_TIMEOUT;
                 break;
@@ -1096,7 +1096,7 @@ static void LIBUSB_CALL lusb_stream_cb(struct libusb_transfer *transfer)
                 break;
 
             default:
-                log_error("Unexpected transfer status: %d\n", transfer->status);
+                log_error("Unexpected transfer status: %d\n\r", transfer->status);
                 break;
         }
     }
@@ -1116,7 +1116,7 @@ static void LIBUSB_CALL lusb_stream_cb(struct libusb_transfer *transfer)
             /* Call user callback requesting more data to transmit */
             next_buffer = stream->cb(
                 stream->dev, stream, &metadata, transfer->buffer,
-                bytes_to_sc16q11(transfer->actual_length), stream->user_data);
+                bytes_to_samples(stream->format, transfer->actual_length), stream->user_data);
         }
 
         if (next_buffer == BLADERF_STREAM_SHUTDOWN) {

@@ -1011,8 +1011,17 @@ static int bladerf2_get_sample_rate(struct bladerf *dev,
     NULL_CHECK(rate);
 
     struct bladerf2_board_data *board_data = dev->board_data;
+    bladerf_sample_rate double_rate;
+    CHECK_STATUS(board_data->rfic->get_sample_rate(dev, ch, rate));
 
-    return board_data->rfic->get_sample_rate(dev, ch, rate);
+    /* OVERSAMPLE feature reports half of the actual
+       sample rate so we have to double it on return */
+    if (dev->feature == BLADERF_FEATURE_OVERSAMPLE) {
+        double_rate = *rate*2;
+        *rate = double_rate;
+    }
+
+    return 0;
 }
 
 static int bladerf2_set_sample_rate(struct bladerf *dev,
@@ -1034,6 +1043,17 @@ static int bladerf2_set_sample_rate(struct bladerf *dev,
     CHECK_STATUS(dev->board->get_sample_rate_range(dev, ch, &range));
 
     if (!is_within_range(range, rate)) {
+        return BLADERF_ERR_RANGE;
+    }
+
+    /* Feature range check */
+    if (dev->feature == BLADERF_FEATURE_OVERSAMPLE &&
+        !is_within_range(&bladerf2_sample_rate_range_oversample, rate)) {
+        log_error("Sample rate outside of OVERSAMPLE feature range\n");
+        return BLADERF_ERR_RANGE;
+    } else if (dev->feature == BLADERF_FEATURE_DEFAULT &&
+               !is_within_range(&bladerf2_sample_rate_range_base, rate)) {
+        log_error("Sample rate outside of DEFAULT feature range\n");
         return BLADERF_ERR_RANGE;
     }
 
@@ -1090,6 +1110,12 @@ static int bladerf2_set_sample_rate(struct bladerf *dev,
 
             return BLADERF_ERR_UNEXPECTED;
         }
+    }
+
+    /* The AD9361 doubles the sampling rate in OVERSAMPLE mode
+       so we must halve the sampling rate prior to setting */
+    if (dev->feature == BLADERF_FEATURE_OVERSAMPLE) {
+        rate /= 2;
     }
 
     /* Set the sample rate */
@@ -1154,6 +1180,10 @@ static int bladerf2_set_bandwidth(struct bladerf *dev,
                                   bladerf_bandwidth *actual)
 {
     CHECK_BOARD_STATE(STATE_INITIALIZED);
+
+    if (dev->feature == BLADERF_FEATURE_OVERSAMPLE) {
+        log_warning("bandwidth assignements with oversample feature enabled yields unkown results\n");
+    }
 
     struct bladerf2_board_data *board_data = dev->board_data;
 
@@ -1687,7 +1717,7 @@ static int bladerf2_get_correction(struct bladerf *dev,
 
         CHECK_AD936X(ad9361_get_tx_rf_port_output(phy, &mode));
 
-        low_band = (mode == AD936X_TXA);
+        low_band = (mode != AD936X_TXA);
     } else {
         uint32_t mode;
 
@@ -1699,7 +1729,7 @@ static int bladerf2_get_correction(struct bladerf *dev,
             RETURN_ERROR_STATUS("mode", BLADERF_ERR_UNSUPPORTED);
         }
 
-        low_band = (mode == AD936X_A_BALANCED);
+        low_band = (mode != AD936X_A_BALANCED);
     }
 
     if ((corr == BLADERF_CORR_DCOFF_I || corr == BLADERF_CORR_DCOFF_Q) &&
@@ -1819,7 +1849,7 @@ static int bladerf2_set_correction(struct bladerf *dev,
 
         CHECK_AD936X(ad9361_get_tx_rf_port_output(phy, &mode));
 
-        low_band = (mode == AD936X_TXA);
+        low_band = (mode != AD936X_TXA);
     } else {
         uint32_t mode;
 
@@ -1831,7 +1861,7 @@ static int bladerf2_set_correction(struct bladerf *dev,
             RETURN_ERROR_STATUS("mode", BLADERF_ERR_UNSUPPORTED);
         }
 
-        low_band = (mode == AD936X_A_BALANCED);
+        low_band = (mode != AD936X_A_BALANCED);
     }
 
     if ((corr == BLADERF_CORR_DCOFF_I || corr == BLADERF_CORR_DCOFF_Q) &&
@@ -2107,6 +2137,12 @@ static int bladerf2_sync_config(struct bladerf *dev,
 
     bladerf_direction dir = layout & BLADERF_DIRECTION_MASK;
     int status;
+
+    if (dev->feature == BLADERF_FEATURE_OVERSAMPLE
+        && (format == BLADERF_FORMAT_SC16_Q11 || format == BLADERF_FORMAT_SC16_Q11_META)) {
+        log_error("16bit format unsupported with OVERSAMPLE feature enabled\n");
+        return BLADERF_ERR_UNSUPPORTED;
+    }
 
     switch (layout) {
         case BLADERF_RX_X1:

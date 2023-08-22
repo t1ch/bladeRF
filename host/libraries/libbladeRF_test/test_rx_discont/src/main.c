@@ -42,12 +42,13 @@
 
 #define RESET_EXPECTED  UINT32_MAX
 
-#define OPTSTR "hs:i:t:v"
+#define OPTSTR "hs:i:t:b:v"
 const struct option long_options[] = {
     { "help",           no_argument,        0,          'h' },
     { "device",         required_argument,  0,          'd' },
     { "samplerate",     required_argument,  0,          's' },
     { "iterations",     required_argument,  0,          'i' },
+    { "bitmode",        required_argument,  0,          'b' },
     { "verbose",        no_argument,        0,          'v' },
 };
 
@@ -70,6 +71,7 @@ struct app_params {
     unsigned int samplerate;
     unsigned int iterations;
     char *device_str;
+    bladerf_format fmt;
 };
 
 static void print_usage(const char *argv0)
@@ -78,6 +80,9 @@ static void print_usage(const char *argv0)
     printf("libbladerf_test_discont: Test for discontinuities.\n");
     printf("\n");
     printf("Options:\n");
+    printf("    -b, --bitmode <mode>        Specify 16bit or 8bit mode\n");
+    printf("                                    <16bit|16> (default)\n");
+    printf("                                    <8bit|8>\n");
     printf("    -s, --samplerate <value>    Use the specified sample rate.\n");
     printf("    -t, --test <test name>      Run the specified test.\n");
     printf("    -i, --iterations <count>    Run the specified number of iterations\n");
@@ -100,6 +105,7 @@ int handle_cmdline(int argc, char *argv[], struct app_params *p)
     p->samplerate = 1000000;
     p->iterations = 10000;
     p->device_str = NULL;
+    p->fmt        = BLADERF_FORMAT_SC16_Q11;
 
     while ((c = getopt_long(argc, argv, OPTSTR, long_options, &idx)) >= 0) {
         switch (c) {
@@ -137,6 +143,17 @@ int handle_cmdline(int argc, char *argv[], struct app_params *p)
                 bladerf_log_set_verbosity(BLADERF_LOG_LEVEL_VERBOSE);
                 break;
 
+            case 'b':
+                if (strcmp(optarg, "16bit") == 0 || strcmp(optarg, "16") == 0) {
+                    p->fmt = BLADERF_FORMAT_SC16_Q11;
+                } else if (strcmp(optarg, "8bit") == 0 || strcmp(optarg, "8") == 0) {
+                    p->fmt = BLADERF_FORMAT_SC8_Q7;
+                } else {
+                    printf("Unknown bitmode: %s\n", optarg);
+                    return -1;
+                }
+                break;
+
             case 'h':
                 print_usage(argv[0]);
                 return 1;
@@ -152,6 +169,9 @@ int run_test(struct bladerf *dev, struct app_params *p)
     uint32_t gpio_val, gpio_backup;
     unsigned int i, j;
     uint32_t *data = NULL;
+    uint16_t eight_bit_sample0;
+    uint16_t eight_bit_sample1;
+    int num_samples = (p->fmt == BLADERF_FORMAT_SC8_Q7) ? 2*BUFFER_SIZE : BUFFER_SIZE;
     unsigned int discontinuities = 0;
     unsigned int sample_num = 0;
     unsigned int count_exp = RESET_EXPECTED;
@@ -159,7 +179,7 @@ int run_test(struct bladerf *dev, struct app_params *p)
 
     status = bladerf_sync_config(dev,
                                  BLADERF_MODULE_RX,
-                                 BLADERF_FORMAT_SC16_Q11,
+                                 p->fmt,
                                  NUM_BUFFERS,
                                  BUFFER_SIZE,
                                  NUM_XFERS,
@@ -180,7 +200,7 @@ int run_test(struct bladerf *dev, struct app_params *p)
 
     /* TODO use API macro (in upcoming changeset) */
     gpio_backup = gpio_val;
-    gpio_val |= 0x200;
+    gpio_val |= BLADERF_GPIO_COUNTER_ENABLE;
 
     status = bladerf_config_gpio_write(dev, gpio_val);
     if (status != 0) {
@@ -207,11 +227,11 @@ int run_test(struct bladerf *dev, struct app_params *p)
 
     for (i = 0, status = 0; i < p->iterations && status == 0; i++) {
         if (i % update_interval == 0) {
-            printf("\rCurrent iteration %10u / %-10u", i, p->iterations);
+            printf("\rCurrent iteration %10u / %-10u\n", i, p->iterations);
             fflush(stdout);
         }
 
-        status = bladerf_sync_rx(dev, data, BUFFER_SIZE, NULL, TIMEOUT_MS);
+        status = bladerf_sync_rx(dev, data, num_samples, NULL, TIMEOUT_MS);
         if (status != 0) {
             fprintf(stderr, "\nRX failed: %s\n", bladerf_strerror(status));
         }
@@ -219,18 +239,27 @@ int run_test(struct bladerf *dev, struct app_params *p)
         for (j = 0; j < BUFFER_SIZE; j++) {
             if (count_exp != RESET_EXPECTED) {
                 if (count_exp != data[j]) {
-                    fprintf(stderr, "\nDiscontinuity @ sample %u\n",
-                            sample_num + j);
-                    fprintf(stderr, "   Expected 0x%08x, Got 0x%08x\n",
-                            count_exp, data[j]);
+                    fprintf(stderr, "[%3u] Expected 0x%08x, Got 0x%08x\n",
+                            sample_num+j, count_exp, data[j]);
 
                     count_exp = UINT32_MAX;
                     discontinuities++;
+                    if (discontinuities > 10)
+                        goto out;
                 } else {
-                    count_exp++;
+                    if (p->fmt == BLADERF_FORMAT_SC8_Q7)
+                        /** Increment both samples within the buffer by 2 */
+                        count_exp = (((count_exp>>16) + 2)<<16) | (((count_exp<<16)>>16) + 2);
+                    else
+                        count_exp++;
                 }
             } else {
-                count_exp = data[j] + 1;
+                eight_bit_sample1 = (uint16_t)(data[j]>>16);
+                eight_bit_sample0 = (uint16_t)data[j];
+                if (p->fmt == BLADERF_FORMAT_SC8_Q7)
+                    count_exp = ((eight_bit_sample1+2)<<16) | (eight_bit_sample0+2);
+                else
+                    count_exp = data[j] + 1;
             }
         }
 

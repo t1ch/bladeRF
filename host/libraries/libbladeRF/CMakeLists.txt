@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.5)
+cmake_minimum_required(VERSION 2.8.12)
 project(libbladeRF C)
 
 
@@ -7,8 +7,8 @@ project(libbladeRF C)
 ################################################################################
 
 set(VERSION_INFO_MAJOR  2)
-set(VERSION_INFO_MINOR  4)
-set(VERSION_INFO_PATCH  1)
+set(VERSION_INFO_MINOR  5)
+set(VERSION_INFO_PATCH  0)
 
 if(NOT DEFINED VERSION_INFO_EXTRA)
     set(VERSION_INFO_EXTRA "git")
@@ -120,6 +120,8 @@ if(NOT ENABLE_BACKEND_LIBUSB
    AND NOT ENABLE_BACKEND_CYAPI
    AND NOT ENABLE_BACKEND_DUMMY)
     message(FATAL_ERROR
+            "Cannot enable any libbladeRF backends due to missing library support. "
+            "Consider installing libusb dev package (libusb-1.0-0-dev on Ubuntu). "
             "No libbladeRF backends are enabled. "
             "Please enable one or more backends." )
 endif()
@@ -425,6 +427,9 @@ if(MSVC)
     )
 endif()
 
+if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.20)
+    cmake_policy(SET CMP0115 OLD)
+endif(CMAKE_VERSION VERSION_GREATER_EQUAL 3.20)
 add_library(libbladerf_shared SHARED ${LIBBLADERF_SOURCE})
 
 
@@ -540,13 +545,17 @@ if(BUILD_LIBBLADERF_DOCUMENTATION)
 
         set(LOGO_IMAGE "${CMAKE_CURRENT_SOURCE_DIR}/doc/images/logo.png")
 
+        file(GLOB INCLUDE_H ${CMAKE_CURRENT_SOURCE_DIR}/include/*.h)
+        file(GLOB DOC_DOX ${CMAKE_CURRENT_SOURCE_DIR}/doc/doxygen/*.dox)
+        file(GLOB DOC_EXAMPLES ${CMAKE_CURRENT_SOURCE_DIR}/doc/examples/*)
+        file(GLOB DOC_IMAGES ${CMAKE_CURRENT_SOURCE_DIR}/doc/images/*)
         set(DOXYGEN_SOURCE_FILES
             ${CMAKE_CURRENT_BINARY_DIR}/doc/doxygen/Doxyfile
-            ${CMAKE_CURRENT_SOURCE_DIR}/include/*.h
-            ${CMAKE_CURRENT_SOURCE_DIR}/doc/doxygen/*.dox
+            ${INCLUDE_H}
+            ${DOC_DOX}
             ${CMAKE_CURRENT_SOURCE_DIR}/doc/doxygen/layout.xml
-            ${CMAKE_CURRENT_SOURCE_DIR}/doc/examples/*
-            ${CMAKE_CURRENT_SOURCE_DIR}/doc/images/*
+            ${DOC_EXAMPLES}
+            ${DOC_IMAGES}
         )
 
         configure_file(
