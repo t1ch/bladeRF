@@ -29,8 +29,8 @@ library work;
     use work.bladerf_p.all;
     use work.fifo_readwrite_p.all;
 
-library enodeb;
-    use enodeb.all;
+library gnodeb;
+    use gnodeb.all;
 
 architecture hosted_bladerf of bladerf is
 
@@ -178,7 +178,7 @@ architecture hosted_bladerf of bladerf is
     signal wbm_wb_cyc_o           : std_logic;
 begin
 
-    U_enodeb_top : entity enodeb.enodeb_top
+    U_gnodeb_top : entity gnodeb.gnodeb_top
       port map(
         tx_clock => tx_clock,
         tx_reset => tx_reset,

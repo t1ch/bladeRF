@@ -36,9 +36,9 @@ set_global_assignment -name VHDL_FILE [file normalize [file join $nuand_ip ps_sy
 set_global_assignment -name VHDL_FILE [file normalize [file join $common_dir vhdl/fx3_gpif.vhd]]
 set_global_assignment -name VHDL_FILE [file normalize [file join $here vhdl/tx.vhd]]
 set_global_assignment -name VHDL_FILE [file normalize [file join $here vhdl/rx.vhd]]
-set_global_assignment -name VHDL_FILE [file normalize [file join $here vhdl/bladerf-enodeb.vhd]]
+set_global_assignment -name VHDL_FILE [file normalize [file join $here vhdl/bladerf-gnodeb.vhd]]
 set_global_assignment -name QIP_FILE  [file normalize                  nios_system/synthesis/nios_system.qip]
 
 # Explicitly include Nios mem_init
 set_global_assignment -name QIP_FILE [file normalize bladeRF_nios/mem_init/meminit.qip]
-set_global_assignment -name QIP_FILE     [file normalize                       ../../../../../bladeRF-enodeb/fpga/quartus/enodeb.qip]
+set_global_assignment -name QIP_FILE     [file normalize                       ../../../../../bladeRF-gnodeb/fpga/quartus/gnodeb.qip]
