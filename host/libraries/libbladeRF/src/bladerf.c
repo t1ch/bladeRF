@@ -632,11 +632,24 @@ int bladerf_set_sample_rate(struct bladerf *dev,
                             bladerf_sample_rate *actual)
 {
     int status;
+    bladerf_feature feature = dev->feature;
+
     MUTEX_LOCK(&dev->lock);
-
     status = dev->board->set_sample_rate(dev, ch, rate, actual);
-
     MUTEX_UNLOCK(&dev->lock);
+
+    /*****************************************************
+      Sample rate assignments clear previous register
+      values. We must reassign oversample register config
+      for every set_samplerate().
+    *******************************************************/
+    if ((feature & BLADERF_FEATURE_OVERSAMPLE)) {
+        status = bladerf_set_oversample_register_config(dev);
+        if (status != 0) {
+            log_error("Oversample register config failure\n");
+        }
+    }
+
     return status;
 }
 
@@ -991,6 +1004,8 @@ int bladerf_init_stream(struct bladerf_stream **stream,
                         void *data)
 {
     int status;
+    bladerf_sample_rate tx_samp_rate;
+    bladerf_sample_rate rx_samp_rate;
     MUTEX_LOCK(&dev->lock);
 
     if (format == BLADERF_FORMAT_SC8_Q7 || format == BLADERF_FORMAT_SC8_Q7_META) {
@@ -1003,6 +1018,22 @@ int bladerf_init_stream(struct bladerf_stream **stream,
     status = dev->board->init_stream(stream, dev, callback, buffers,
                                      num_buffers, format, samples_per_buffer,
                                      num_transfers, data);
+
+    dev->board->get_sample_rate(dev, BLADERF_MODULE_TX, &tx_samp_rate);
+    if (tx_samp_rate) {
+        if (tx_samp_rate < num_transfers * samples_per_buffer / (*stream)->transfer_timeout) {
+            log_warning("TX samples may be dropped.\n");
+            log_warning("Condition to meet: samp_rate > num_transfers * samples_per_buffer / transfer_timeout\n");
+        }
+    }
+
+    dev->board->get_sample_rate(dev, BLADERF_MODULE_RX, &rx_samp_rate);
+    if (rx_samp_rate) {
+        if (rx_samp_rate < num_transfers * samples_per_buffer / (*stream)->transfer_timeout) {
+            log_warning("RX samples may be dropped.\n");
+            log_warning("Condition to meet: samp_rate > num_transfers * samples_per_buffer / transfer_timeout\n");
+        }
+    }
 
     MUTEX_UNLOCK(&dev->lock);
     return status;

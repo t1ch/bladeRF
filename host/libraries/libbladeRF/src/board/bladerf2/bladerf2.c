@@ -957,7 +957,11 @@ static int bladerf2_get_sample_rate_range(struct bladerf *dev,
 {
     NULL_CHECK(range);
 
-    *range = &bladerf2_sample_rate_range;
+    *range = &bladerf2_sample_rate_range_base;
+
+    if (dev->feature == BLADERF_FEATURE_OVERSAMPLE) {
+        *range = &bladerf2_sample_rate_range_oversample;
+    }
 
     return 0;
 }
@@ -1081,6 +1085,11 @@ static int bladerf2_set_sample_rate(struct bladerf *dev,
             txfir != BLADERF_RFIC_TXFIR_INT4) {
             log_debug("%s: enabling 4x decimation/interpolation filters\n",
                       __FUNCTION__);
+
+            /* Intermidiate sample rate assignment to circumvent rfic->set_filter error */
+            if ((current > 40e6 && rate < 2083334) || (rate > 40e6 && current < 2083334)) {
+                CHECK_STATUS(rfic->set_sample_rate(dev, ch, 30e6));
+            }
 
             status = rfic->set_filter(dev, BLADERF_CHANNEL_RX(0),
                                       BLADERF_RFIC_RXFIR_DEC4, 0);
@@ -2231,9 +2240,11 @@ static int bladerf2_load_fpga(struct bladerf *dev,
         RETURN_INVAL("fpga file", "incorrect file size");
     }
 
-    CHECK_STATUS(dev->backend->load_fpga(dev, buf, length));
+    if (dev->backend->is_fpga_configured(dev)) {
+        CHECK_STATUS(board_data->rfic->standby(dev));
+    }
 
-    /* Update device state */
+    CHECK_STATUS(dev->backend->load_fpga(dev, buf, length));
     board_data->state = STATE_FPGA_LOADED;
 
     CHECK_STATUS(_bladerf2_initialize(dev));

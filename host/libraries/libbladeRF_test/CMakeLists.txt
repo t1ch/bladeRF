@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.12)
+cmake_minimum_required(VERSION 3.9)
 
 add_subdirectory(test_async)
 add_subdirectory(test_bootloader_recovery)
@@ -23,3 +23,20 @@ add_subdirectory(test_unused_sync)
 add_subdirectory(test_version)
 add_subdirectory(test_digital_loopback)
 add_subdirectory(test_interleaver)
+add_subdirectory(test_rx_meta)
+add_subdirectory(test_fpga_load)
+
+option(TEST_REGRESSION "Include regression tests" OFF)
+if(TEST_REGRESSION)
+    add_subdirectory(test_regression)
+endif()
+
+configure_file(requirements.txt
+               ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/requirements.txt
+               FILE_PERMISSIONS OWNER_EXECUTE OWNER_READ
+               COPYONLY)
+
+configure_file(setup_env.sh
+               ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/setup_env.sh
+               FILE_PERMISSIONS OWNER_EXECUTE OWNER_READ
+               COPYONLY)
