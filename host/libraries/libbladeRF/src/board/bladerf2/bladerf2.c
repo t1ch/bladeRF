@@ -786,8 +786,6 @@ static int bladerf2_get_gain_modes(struct bladerf *dev,
                                    bladerf_channel ch,
                                    struct bladerf_gain_modes const **modes)
 {
-    NULL_CHECK(modes);
-
     struct bladerf_gain_modes const *mode_infos;
     unsigned int mode_infos_len;
 
@@ -799,7 +797,9 @@ static int bladerf2_get_gain_modes(struct bladerf *dev,
         mode_infos_len = ARRAY_SIZE(bladerf2_rx_gain_modes);
     }
 
-    *modes = mode_infos;
+    if (modes != NULL) {
+        *modes = mode_infos;
+    }
 
     return mode_infos_len;
 }
@@ -2240,11 +2240,9 @@ static int bladerf2_load_fpga(struct bladerf *dev,
         RETURN_INVAL("fpga file", "incorrect file size");
     }
 
-    if (dev->backend->is_fpga_configured(dev)) {
-        CHECK_STATUS(board_data->rfic->standby(dev));
-    }
-
     CHECK_STATUS(dev->backend->load_fpga(dev, buf, length));
+
+    /* Update device state */
     board_data->state = STATE_FPGA_LOADED;
 
     CHECK_STATUS(_bladerf2_initialize(dev));
@@ -3575,6 +3573,10 @@ int bladerf_set_clock_select(struct bladerf *dev, bladerf_clock_select sel)
 {
     CHECK_BOARD_IS_BLADERF2(dev);
     CHECK_BOARD_STATE(STATE_FPGA_LOADED);
+
+    if (bladerf_device_speed(dev) == BLADERF_DEVICE_SPEED_HIGH) {
+        log_warning("USB 3.0 recommended for reliable clock select assignment.\n");
+    }
 
     WITH_MUTEX(&dev->lock, {
         uint32_t gpio;
