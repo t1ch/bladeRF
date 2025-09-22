@@ -127,6 +127,8 @@ make_revision wlan
 # Create the bladerf
 make_revision bladerf
 
+# Create the gnodeb
+make_revision gnodeb
 
 # Projects created!
 puts "${PROJECT_NAME} projects created!"
