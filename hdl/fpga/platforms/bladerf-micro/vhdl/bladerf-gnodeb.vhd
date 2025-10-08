@@ -32,7 +32,7 @@ library work;
 library gnodeb;
     use gnodeb.all;
 
-architecture hosted_bladerf of bladerf is
+architecture gnodeb_bladerf of bladerf is
 
     attribute noprune          : boolean;
     attribute keep             : boolean;
@@ -40,140 +40,103 @@ architecture hosted_bladerf of bladerf is
     alias  sys_reset_async     : std_logic is fx3_ctl(7);
     signal sys_reset_pclk      : std_logic;
     signal sys_reset           : std_logic;
-
     signal sys_clock           : std_logic;
     signal sys_clock_out       : std_logic;
     signal sys_pll_locked      : std_logic;
     signal sys_pll_reset       : std_logic;
-
     signal fx3_pclk_pll        : std_logic;
     signal fx3_pclk_pll_out    : std_logic;
     signal fx3_pclk_pll_locked : std_logic;
     signal fx3_pclk_pll_reset  : std_logic;
 
     signal rx_mux_sel             : unsigned(2 downto 0);
-
     signal nios_xb_gpio_in        : std_logic_vector(31 downto 0) := (others => '0');
     signal nios_xb_gpio_out       : std_logic_vector(31 downto 0) := (others => '0');
     signal nios_xb_gpio_oe        : std_logic_vector(31 downto 0) := (others => '0');
-
     signal nios_gpio              : nios_gpio_t;
     signal nios_gpo_slv           : std_logic_vector(31 downto 0);
-
     signal i2c_scl_in             : std_logic;
     signal i2c_scl_out            : std_logic;
     signal i2c_scl_oen            : std_logic;
-
     signal i2c_sda_in             : std_logic;
     signal i2c_sda_out            : std_logic;
     signal i2c_sda_oen            : std_logic;
-
     signal tx_sample_fifo         : tx_fifo_t       := TX_FIFO_T_DEFAULT;
     signal rx_sample_fifo         : rx_fifo_t       := RX_FIFO_T_DEFAULT;
     signal tx_loopback_fifo       : loopback_fifo_t := LOOPBACK_FIFO_T_DEFAULT;
-
     signal tx_meta_fifo           : meta_fifo_tx_t := META_FIFO_TX_T_DEFAULT;
     signal rx_meta_fifo           : meta_fifo_rx_t := META_FIFO_RX_T_DEFAULT;
-
     signal usb_speed_pclk         : std_logic;
     signal usb_speed_rx           : std_logic;
     signal usb_speed_tx           : std_logic;
-
     signal tx_reset               : std_logic;
     signal rx_reset               : std_logic;
-
     signal tx_enable_pclk         : std_logic;
     signal rx_enable_pclk         : std_logic;
-
     signal tx_enable              : std_logic;
     signal rx_enable              : std_logic;
-
     signal meta_en_pclk           : std_logic;
     signal meta_en_tx             : std_logic;
     signal meta_en_rx             : std_logic;
-
     signal eightbit_en_pclk       : std_logic;
     signal eightbit_en_tx         : std_logic;
     signal eightbit_en_rx         : std_logic;
 
     signal highly_packed_en_txrx  : std_logic;
-
     signal packet_en_pclk         : std_logic;
     signal packet_en_tx           : std_logic;
     signal packet_en_rx           : std_logic;
-
     signal tx_timestamp           : unsigned(63 downto 0);
     signal rx_timestamp           : unsigned(63 downto 0);
     signal timestamp_sync         : std_logic;
-
     signal tx_loopback_enabled    : std_logic := '0';
 
     signal fx3_gpif_in            : std_logic_vector(31 downto 0);
     signal fx3_gpif_out           : std_logic_vector(31 downto 0);
     signal fx3_gpif_oe            : std_logic;
-
     signal fx3_ctl_in             : std_logic_vector(12 downto 0);
     signal fx3_ctl_out            : std_logic_vector(12 downto 0);
     signal fx3_ctl_oe             : std_logic_vector(12 downto 0);
-
     signal tx_underflow_led       : std_logic := '1';
     signal rx_overflow_led        : std_logic := '1';
-
     signal led1_blink             : std_logic;
-
     signal nios_sdo               : std_logic;
     signal nios_sdio              : std_logic;
     signal nios_sclk              : std_logic;
     signal nios_ss_n              : std_logic_vector(1 downto 0);
-
     signal command_serial_in      : std_logic;
     signal command_serial_out     : std_logic;
-
     signal timestamp_req          : std_logic;
     signal timestamp_ack          : std_logic;
     signal fx3_timestamp          : unsigned(63 downto 0);
-
     signal rx_ts_reset            : std_logic;
     signal tx_ts_reset            : std_logic;
-
     signal rx_trigger_ctl_i       : std_logic_vector(7 downto 0);
     signal rx_trigger_ctl         : trigger_t := TRIGGER_T_DEFAULT;
     alias  rx_trigger_line        : std_logic is mini_exp1;
-
     signal tx_trigger_ctl_i       : std_logic_vector(7 downto 0);
     signal tx_trigger_ctl         : trigger_t := TRIGGER_T_DEFAULT;
     alias  tx_trigger_line        : std_logic is mini_exp1;
-
     signal rffe_gpio              : rffe_gpio_t := (
         i => RFFE_GPI_DEFAULT,
         o => pack(RFFE_GPO_DEFAULT)
     );
-
     signal ad9361                 : mimo_2r2t_t := MIMO_2R2T_T_DEFAULT;
     alias tx_clock  is ad9361.clock;
     alias rx_clock  is ad9361.clock;
-
     signal mimo_rx_enables        : std_logic_vector(RFFE_GPO_DEFAULT.mimo_rx_en'range) := RFFE_GPO_DEFAULT.mimo_rx_en;
     signal mimo_tx_enables        : std_logic_vector(RFFE_GPO_DEFAULT.mimo_tx_en'range) := RFFE_GPO_DEFAULT.mimo_tx_en;
-
     signal dac_controls           : sample_controls_t(ad9361.ch'range)    := (others => SAMPLE_CONTROL_DISABLE);
     signal dac_streams            : sample_streams_t(dac_controls'range)  := (others => ZERO_SAMPLE);
     signal adc_controls           : sample_controls_t(ad9361.ch'range)    := (others => SAMPLE_CONTROL_DISABLE);
     signal adc_streams            : sample_streams_t(adc_controls'range)  := (others => ZERO_SAMPLE);
     signal adc_streams_last_v     : std_logic_vector(adc_controls'range)  := (others => '0');
-
     signal   ps_sync              : std_logic_vector(0 downto 0)          := (others => '0');
-
-
     signal tx_packet_control      : packet_control_t ;
     signal rx_packet_control      : packet_control_t := PACKET_CONTROL_DEFAULT ;
-
     signal rx_packet_ready        : std_logic;
-
     signal tx_packet_ready        : std_logic;
     signal tx_packet_empty        : std_logic;
-
-
     signal wbm_wb_clk_i           : std_logic;
     signal wbm_wb_rst_i           : std_logic;
     signal wbm_wb_adr_o           : std_logic_vector(31 downto 0);
@@ -184,37 +147,42 @@ architecture hosted_bladerf of bladerf is
     signal wbm_wb_stb_o           : std_logic;
     signal wbm_wb_ack_i           : std_logic;
     signal wbm_wb_cyc_o           : std_logic;
+
+    -- Custom PDU handling signals
+    signal pdu_rx_count           : unsigned(31 downto 0);
+    signal pdu_tx_count           : unsigned(31 downto 0);
+    signal led_control_pdu        : std_logic_vector(2 downto 0);
+
 begin
-  U_gnodeb_top : entity gnodeb.gnodeb_top
-    port map(
-      --rx_clock => rx_clock,
-      --rx_reset => rx_reset,
-      --rx_enable => rx_enable,
-      --rx_packet_enable => packet_en_rx,
-      --rx_packet_ready => rx_packet_ready,
-      --rx_packet_control => rx_packet_control,
-      tx_clock => tx_clock,
-      tx_reset => tx_reset,
-      --tx_enable => tx_enable,
-      tx_packet_control => tx_packet_control,
-      tx_packet_empty => tx_packet_empty,
-      tx_packet_ready => tx_packet_ready,
-      leds => led
-      );
 
-     U_rx_pkt_gen : entity work.rx_packet_generator
-         port map(
-             rx_clock               => rx_clock,
-             rx_reset               => rx_reset,
+    -- Custom PDU handler replaces the original packet generator
+    U_gnodeb_top : entity gnodeb.gnodeb_top
+        port map(
+            -- Clocks and Resets
+            rx_clock           => rx_clock,
+            rx_reset           => rx_reset,
+            rx_enable          => rx_enable,
+            tx_clock           => tx_clock,
+            tx_reset           => tx_reset,
+            tx_enable          => tx_enable,
 
-             rx_packet_ready        => rx_packet_ready,
+            -- Packet Enable (use the one for the RX clock domain)
+            packet_en          => packet_en_rx,
 
-             rx_enable              => rx_enable,
-             rx_packet_enable       => packet_en_rx,
+            -- TX Interface (Host -> FPGA)
+            tx_packet_control  => tx_packet_control,
+            tx_packet_empty    => tx_packet_empty,
+            tx_packet_ready    => tx_packet_ready,
 
-             rx_packet_control      => rx_packet_control
-         ) ;
+            -- RX Interface (FPGA -> Host)
+            rx_packet_control  => rx_packet_control,
+            rx_packet_ready    => rx_packet_ready,
 
+            -- Outputs
+            led_control        => led_control_pdu,
+            pdu_rx_count       => pdu_rx_count,
+            pdu_tx_count       => pdu_tx_count
+        );
 
     -- ========================================================================
     -- PLLs
@@ -275,7 +243,6 @@ begin
             pll_reset      => fx3_pclk_pll_reset
         );
 
-
     -- ========================================================================
     -- POWER SUPPLY SYNCHRONIZATION
     -- ========================================================================
@@ -285,13 +252,13 @@ begin
             OUTPUTS  => 1,
             USE_LFSR => true,
             HOP_LIST => adp2384_sync_divisors( REFCLK_HZ  => 38.4e6,
-                                               n_divisors => 7 ),
+                                             n_divisors => 7 ),
             HOP_RATE => 100
         )
         port map (
             refclk   => c5_clock2,
             sync     => ps_sync
-        );
+         );
 
     ps_sync_1p1 <= ps_sync(0);
     ps_sync_1p8 <= ps_sync(0);
@@ -380,7 +347,6 @@ begin
             end if;
         end if;
     end process;
-
 
     -- ========================================================================
     -- NIOS SYSTEM
@@ -484,7 +450,7 @@ begin
             wbm_wb_stb_o                    => wbm_wb_stb_o,
             wbm_wb_ack_i                    => wbm_wb_ack_i,
             wbm_wb_cyc_o                    => wbm_wb_cyc_o
-        );
+         );
 
     -- FX3 UART
     command_serial_in <= fx3_uart_txd       when sys_reset = '0' else '1';
@@ -518,10 +484,18 @@ begin
     rx_trigger_ctl <= unpack(rx_trigger_ctl_i, rx_trigger_line);
     tx_trigger_ctl <= unpack(tx_trigger_ctl_i, tx_trigger_line);
 
-    -- LEDs
-    -- led(1) <= led1_blink        when nios_gpio.o.led_mode = '0' else not nios_gpio.o.leds(1);
-    -- led(2) <= tx_underflow_led  when nios_gpio.o.led_mode = '0' else not nios_gpio.o.leds(2);
-    -- led(3) <= rx_overflow_led   when nios_gpio.o.led_mode = '0' else not nios_gpio.o.leds(3);
+    -- LEDs - Modified to use PDU control when packet mode is enabled
+    led(1) <= led_control_pdu(0) when (nios_gpio.o.packet_en = '1') else
+              led1_blink when (nios_gpio.o.led_mode = '0') else
+              not nios_gpio.o.leds(1);
+
+    led(2) <= led_control_pdu(1) when (nios_gpio.o.packet_en = '1') else
+              tx_underflow_led when (nios_gpio.o.led_mode = '0') else
+              not nios_gpio.o.leds(2);
+
+    led(3) <= led_control_pdu(2) when (nios_gpio.o.packet_en = '1') else
+              rx_overflow_led when (nios_gpio.o.led_mode = '0') else
+              not nios_gpio.o.leds(3);
 
     -- DAC SPI (data latched on falling edge)
     dac_sclk <= not nios_sclk when nios_gpio.o.adf_chip_enable = '0' else '0';
@@ -533,7 +507,6 @@ begin
     adf_sdi  <= nios_sdio    when nios_gpio.o.adf_chip_enable = '1' else '0';
     adf_csn  <= nios_ss_n(1) when nios_gpio.o.adf_chip_enable = '1' else '1';
     adf_ce   <= nios_gpio.o.adf_chip_enable;
-
     nios_sdo <= adf_muxout when ((nios_ss_n(1) = '0') and (nios_gpio.o.adf_chip_enable = '1'))
                 else '0';
 
@@ -561,8 +534,6 @@ begin
     generate_xb_gpio_out : for i in exp_gpio'range generate
         exp_gpio(i) <= nios_xb_gpio_out(i) when nios_xb_gpio_oe(i) = '1' else 'Z';
     end generate;
-
-    -- tx_packet_ready <= '1';
 
     -- TX Submodule
     U_tx : entity work.tx
@@ -632,7 +603,6 @@ begin
                                         mimo_tx_enables(i);
             dac_controls(i).data_req <= (ad9361.ch(i).dac.i.valid  or ad9361.ch(i).dac.q.valid  or tx_loopback_enabled) and
                                         mimo_tx_enables(i);
-
             if (rising_edge(tx_clock) and dac_streams(i).data_v = '1') then
                 ad9361.ch(i).dac.i.data  <= std_logic_vector(dac_streams(i).data_i(11 downto 0)) & "0000";
                 ad9361.ch(i).dac.q.data  <= std_logic_vector(dac_streams(i).data_q(11 downto 0)) & "0000";
@@ -667,7 +637,7 @@ begin
             eight_bit_mode_en      => eightbit_en_rx,
             highly_packed_mode_en  => highly_packed_en_txrx,
 
-            -- Packet FIFO
+            -- Packet FIFO - CORRECTED MAPPING
             packet_en              => packet_en_rx,
             packet_control         => rx_packet_control,
             packet_ready           => rx_packet_ready,
@@ -777,7 +747,6 @@ begin
             sync                =>  tx_reset
         );
 
-
     -- ========================================================================
     -- SYNCHRONIZERS
     -- ========================================================================
@@ -814,7 +783,6 @@ begin
             async               =>  nios_gpio.o.usb_speed,
             sync                =>  usb_speed_tx
         );
-
 
     U_sync_meta_en_pclk : entity work.synchronizer
         generic map (
@@ -1022,7 +990,6 @@ begin
             async       =>  tx_enable_pclk,
             sync        =>  tx_enable
         );
-
 
     -- ========================================================================
     -- HANDSHAKES
