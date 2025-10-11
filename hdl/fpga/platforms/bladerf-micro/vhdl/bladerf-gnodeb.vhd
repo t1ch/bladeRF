@@ -184,37 +184,40 @@ architecture hosted_bladerf of bladerf is
     signal wbm_wb_stb_o           : std_logic;
     signal wbm_wb_ack_i           : std_logic;
     signal wbm_wb_cyc_o           : std_logic;
+    signal test_packet_gen : std_logic := '0';
+    signal test_counter : natural range 0 to 100_000_000 := 0;
+
 begin
+
   U_gnodeb_top : entity gnodeb.gnodeb_top
-    port map(
-      rx_clock => rx_clock,
-      rx_reset => rx_reset,
-      rx_enable => rx_enable,
-      rx_packet_enable => packet_en_rx,
-      rx_packet_ready => rx_packet_ready,
-      rx_packet_control => rx_packet_control,
-      tx_clock => tx_clock,
-      tx_reset => tx_reset,
-      tx_enable => tx_enable,
-      tx_packet_control => tx_packet_control,
-      tx_packet_empty => tx_packet_empty,
-      tx_packet_ready => tx_packet_ready,
-      leds => led
+    port map (
+      tx_clock               =>  tx_clock,
+      tx_reset               =>  tx_reset,
+      leds                   =>  led,
+
+      tx_packet_control      =>  tx_packet_control,
+      tx_packet_empty        =>  tx_packet_empty,
+      tx_packet_ready        =>  tx_packet_ready
       );
 
-    -- U_rx_pkt_gen : entity work.rx_packet_generator
-    --     port map(
-    --         rx_clock               => rx_clock,
-    --         rx_reset               => rx_reset,
+  test_packet_inject : process(tx_clock)
+  begin
+    if rising_edge(tx_clock) then
+      test_counter <= test_counter + 1;
 
-    --         rx_packet_ready        => rx_packet_ready,
+      -- Every 100ms, generate a test packet
+      if test_counter = 40_000_000 then  -- Adjust for your clock frequency
+        test_counter <= 0;
+        test_packet_gen <= '1';
+      else
+        test_packet_gen <= '0';
+      end if;
+    end if;
+  end process;
 
-    --         rx_enable              => rx_enable,
-    --         rx_packet_enable       => packet_en_rx,
-
-    --         rx_packet_control      => rx_packet_control
-    --     ) ;
-
+-- Override tx_packet_empty to simulate packets
+-- Comment this out once you have real packets from USB
+  tx_packet_empty <= '0' when test_packet_gen = '1' else '1';
 
     -- ========================================================================
     -- PLLs
@@ -519,9 +522,9 @@ begin
     tx_trigger_ctl <= unpack(tx_trigger_ctl_i, tx_trigger_line);
 
     -- LEDs
-    -- led(1) <= led1_blink        when nios_gpio.o.led_mode = '0' else not nios_gpio.o.leds(1);
-    -- led(2) <= tx_underflow_led  when nios_gpio.o.led_mode = '0' else not nios_gpio.o.leds(2);
-    -- led(3) <= rx_overflow_led   when nios_gpio.o.led_mode = '0' else not nios_gpio.o.leds(3);
+    --led(1) <= led1_blink        when nios_gpio.o.led_mode = '0' else not nios_gpio.o.leds(1);
+    --led(2) <= tx_underflow_led  when nios_gpio.o.led_mode = '0' else not nios_gpio.o.leds(2);
+    --led(3) <= rx_overflow_led   when nios_gpio.o.led_mode = '0' else not nios_gpio.o.leds(3);
 
     -- DAC SPI (data latched on falling edge)
     dac_sclk <= not nios_sclk when nios_gpio.o.adf_chip_enable = '0' else '0';
@@ -562,7 +565,7 @@ begin
         exp_gpio(i) <= nios_xb_gpio_out(i) when nios_xb_gpio_oe(i) = '1' else 'Z';
     end generate;
 
-    -- tx_packet_ready <= '1';
+    --tx_packet_ready <= '1';
 
     -- TX Submodule
     U_tx : entity work.tx
@@ -591,8 +594,8 @@ begin
             highly_packed_mode_en => highly_packed_en_txrx,
 
             -- Packet FIFO
-            packet_en            => packet_en_tx,
-            packet_empty         => tx_packet_empty,
+            packet_en            => '1', --packet_en_tx,
+            --packet_empty         => tx_packet_empty,
             packet_control       => tx_packet_control,
             packet_ready         => tx_packet_ready,
 
