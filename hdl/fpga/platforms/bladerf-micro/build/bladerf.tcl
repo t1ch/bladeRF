@@ -124,6 +124,9 @@ make_revision foxhunt
 # Create the wlan
 make_revision wlan
 
+# Create the gnodeb
+make_revision gnodeb
+
 
 # Projects created!
 puts "${PROJECT_NAME} projects created!"
