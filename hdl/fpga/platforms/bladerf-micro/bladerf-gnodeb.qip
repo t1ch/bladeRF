@@ -41,6 +41,10 @@ set_global_assignment -name VHDL_FILE [file normalize [file join $here vhdl/rx.v
 set_global_assignment -name VHDL_FILE [file normalize [file join $here vhdl/bladerf-gnodeb.vhd]]
 set_global_assignment -name QIP_FILE  [file normalize                  nios_system/synthesis/nios_system.qip]
 
+# Timing constraints
+set_global_assignment -name SDC_FILE [file normalize [file join $here constraints/bladerf-gnodeb.sdc]]
+
+
 # Explicitly include Nios mem_init
 set_global_assignment -name QIP_FILE [file normalize bladeRF_nios/mem_init/meminit.qip]
 set_global_assignment -name QIP_FILE     [file normalize                       ../../../../../bladeRF-gnodeb/fpga/quartus/gnodeb.qip]
