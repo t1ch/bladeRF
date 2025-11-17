@@ -187,13 +187,20 @@ architecture hosted_bladerf of bladerf is
 begin
 
   U_gnodeb_top : entity gnodeb.gnodeb_top
-    port map (
-      tx_clock               =>  tx_clock,
-      tx_reset               =>  tx_reset,
-      leds                   =>  led,
-      tx_packet_control      =>  tx_packet_control,
-      tx_packet_empty        =>  tx_packet_empty,
-      tx_packet_ready        =>  tx_packet_ready
+    port map(
+      --rx_clock => rx_clock,
+      --rx_reset => rx_reset,
+      --rx_enable => rx_enable,
+      --rx_packet_enable => packet_en_rx,
+      --rx_packet_ready => rx_packet_ready,
+      --rx_packet_control => rx_packet_control,
+      tx_clock => tx_clock,
+      tx_reset => tx_reset,
+      --tx_enable => tx_enable,
+      tx_packet_control => tx_packet_control,
+      tx_packet_empty => tx_packet_empty,
+      tx_packet_ready => tx_packet_ready,
+      leds => led
       );
 
 

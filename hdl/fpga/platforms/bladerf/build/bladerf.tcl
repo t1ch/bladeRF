@@ -108,6 +108,9 @@ make_revision atsc_tx
 # Create ADSB receiver
 make_revision adsb
 
+# Create GNodeB
+make_revision gnodeb
+
 
 # Projects created!
 puts "${PROJECT_NAME} projects created!"
